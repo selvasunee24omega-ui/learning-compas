@@ -1,6 +1,6 @@
 export type Observation = { id: string; date: string; title: string; place: string; senses: string; surprise: string; question?: string; photo?: string }
 export type Question = { id: string; date: string; title: string; observationId?: string }
-export type Exploration = { id: string; date: string; questionId: string; notes: string[]; photo?: string }
+export type Exploration = { id: string; date: string; questionId: string; notes: string[]; photo?: string; resumeStep?: number }
 export type Journal = { observations: Observation[]; questions: Question[]; explorations: Exploration[] }
 export const steps = ['What do we already think?', 'What can we observe?', 'What could we try?', 'What materials do we need?', 'What should we look for?', 'What did we discover?', 'What new question emerged?', 'What could we draw or make? How did exploring feel?']
 export const hints = ['Take turns sharing a guess. What made you think of it?', 'Choose something nearby you can look at or listen to together.', 'Try changing one thing and see what happens.', 'Start with things you already have at home.', 'What might stay the same? What could change?', 'Describe what happened in your own words.', 'Did something you saw make you wonder again?', 'A sketch, a few words, or a quiet moment are all welcome.']

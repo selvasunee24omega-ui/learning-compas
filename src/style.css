@@ -88,3 +88,10 @@ details[open] summary svg{rotate:90deg}
 .entry-detail dd{margin:3px 0 0;white-space:pre-wrap}
 @media(max-width:900px){.header-inner,.shell,footer{width:calc(100% - 44px)}.header-inner{gap:10px}.brand{font-size:20px}nav{gap:2px}nav a{padding:9px}.home-grid{gap:20px}.activity{grid-template-columns:73px 1fr}}
 @media(max-width:680px){.header-inner,.shell,footer{width:calc(100% - 32px)}.header-inner{flex-direction:column;align-items:flex-start;padding:14px 0 9px;gap:11px}.brand-icon{width:36px;height:36px}nav{width:100%;justify-content:space-between}nav a{font-size:.76rem;flex-direction:column;gap:3px;padding:7px 6px;flex:1}.shell{padding-top:24px}.hero{grid-template-columns:1fr}.hero-copy{padding:24px}.hero>img{height:175px;min-height:0}.home-grid{grid-template-columns:1fr;margin-top:26px}.activity{grid-template-columns:95px 1fr}.recent{margin-top:26px}.recent-grid{grid-template-columns:1fr}.field-row{grid-template-columns:1fr}.section-bar .text-link{flex-shrink:0;font-size:.78rem}}
+
+.form-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.secondary-button{min-height:44px;padding:9px 14px;border:1px solid #d7d3c7;border-radius:8px;color:#45523e;background:#faf8f2;font-weight:650}
+.secondary-button:hover:not(:disabled){background:#e9ecdf}
+.secondary-button:disabled{opacity:.55;cursor:default}
+.step-hint{color:var(--muted)}
+.draft-label{display:block;color:var(--muted);font-size:.8rem}

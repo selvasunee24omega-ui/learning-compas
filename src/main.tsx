@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { BookOpen, ChevronRight, Compass, Eye, House, Leaf, MessageCircle, Plus, Sprout, Sun, Telescope, Upload } from 'lucide-react'
 import { dateKey, hints, journalStore, prepareImage, readable, steps } from './journal'
-import type { Journal } from './journal'
+import type { Exploration, Journal, Question } from './journal'
 import './style.css'
 
 const routes = [
@@ -28,8 +28,8 @@ function PageHeading({ label, title, children }: {label: string; title: string; 
 function Field({ name, label, placeholder, multiline, required, type = 'text', value }: {name: string; label: string; placeholder?: string; multiline?: boolean; required?: boolean; type?: string; value?: string}) {
   return <label className="field"><span>{label}</span>{multiline ? <textarea name={name} placeholder={placeholder} required={required} rows={3}/> : <input name={name} type={type} defaultValue={value} placeholder={placeholder} required={required}/>}</label>
 }
-function PhotoField({ onChange }: {onChange: (photo: string, pending: boolean) => void}) {
-  const [photo, setPhoto] = useState('')
+function PhotoField({ initialPhoto = '', onChange }: {initialPhoto?: string; onChange: (photo: string, pending: boolean) => void}) {
+  const [photo, setPhoto] = useState(initialPhoto)
   const [error, setError] = useState('')
   const sequence = useRef(0)
   const input = useRef<HTMLInputElement>(null)
@@ -37,9 +37,8 @@ function PhotoField({ onChange }: {onChange: (photo: string, pending: boolean) =
     const version = ++sequence.current
     const file = event.target.files?.[0]
     setError('')
-    setPhoto('')
-    onChange('', Boolean(file))
     if (!file) return
+    onChange(photo, true)
     try {
       const result = await prepareImage(file)
       if (version !== sequence.current) return
@@ -48,7 +47,8 @@ function PhotoField({ onChange }: {onChange: (photo: string, pending: boolean) =
     } catch {
       if (version !== sequence.current) return
       setError('This image could not be opened. Try a JPEG or PNG.')
-      onChange('', false)
+      event.target.value = ''
+      onChange(photo, false)
     }
   }
   return <div className="photo-field">
@@ -57,27 +57,77 @@ function PhotoField({ onChange }: {onChange: (photo: string, pending: boolean) =
     {photo && <><img className="entry-photo" src={photo} alt="Selected journal attachment"/><button type="button" className="text-link" onClick={() => {if (input.current) input.current.value = ''; setPhoto(''); onChange('', false)}}>Remove image</button></>}
   </div>
 }
-function Form({ children, action, save, attachments = false }: {children: ReactNode; action: string; save: (data: FormData, photo?: string) => void; attachments?: boolean}) {
+function Form({ children, action, save, attachments = false, initialPhoto, extraActions, reset = false }: {
+  children: ReactNode
+  action: string
+  save: (data: FormData, photo?: string, intent?: string) => void
+  attachments?: boolean
+  initialPhoto?: string
+  extraActions?: (pending: boolean) => ReactNode
+  reset?: boolean
+}) {
   const [error, setError] = useState('')
-  const [image, setImage] = useState({photo:'', pending:false})
+  const [image, setImage] = useState({photo:initialPhoto ?? '', pending:false})
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (image.pending) return
     setError('')
     try {
-      save(new FormData(event.currentTarget), image.photo || undefined)
-      event.currentTarget.reset()
+      const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+      save(new FormData(event.currentTarget), image.photo || undefined, submitter?.value)
+      if (reset) event.currentTarget.reset()
     }
     catch (error) {
       setError(error instanceof DOMException ? 'The browser could not save this entry. Try removing the image or freeing some browser storage.' : error instanceof Error ? error.message : 'This entry could not be saved.')
     }
   }
   return <form className="journal-form" onSubmit={submit}>{children}
-    {attachments && <PhotoField onChange={(photo, pending) => setImage({photo, pending})}/>}
+    {attachments && <PhotoField initialPhoto={initialPhoto} onChange={(photo, pending) => setImage({photo, pending})}/>}
     {error && <p className="error" role="alert">{error}</p>}
-    <button className="button" disabled={image.pending}>{action}</button>
+    <div className="form-actions">
+      <button className="button" disabled={image.pending}>{action}</button>
+      {extraActions?.(image.pending)}
+    </div>
   </form>
 }
+function ExplorationForm({ entry, save }: {
+  entry?: Exploration
+  save: (notes: string[], photo: string | undefined, resumeStep?: number) => void
+}) {
+  const [step, setStep] = useState(entry?.resumeStep ?? 0)
+  const [notes, setNotes] = useState(() => steps.map((_, index) => entry?.notes[index] ?? ''))
+  const prompt = useRef<HTMLTextAreaElement>(null)
+  const final = step === steps.length - 1
+
+  function move(next: number) {
+    setStep(next)
+    prompt.current?.focus()
+  }
+
+  return <Form action={final ? 'Finish' : 'Save for later'} attachments initialPhoto={entry?.photo}
+    save={(_, photo, intent) => save(
+      notes.map(note => note.trim()), photo, final && intent !== 'pause' ? undefined : step,
+    )}
+    extraActions={pending => final && <button className="secondary-button" value="pause" disabled={pending}>Save for later</button>}>
+    <p className="eyebrow">Step {step + 1} of {steps.length}</p>
+    <label className="field">
+      <span>{steps[step]}</span>
+      <textarea ref={prompt} rows={4} aria-describedby="exploration-hint" value={notes[step]} onChange={event => {
+        const value = event.target.value
+        setNotes(current => current.map((note, index) => index === step ? value : note))
+      }}/>
+    </label>
+    <p className="step-hint" id="exploration-hint">{hints[step]}</p>
+    <div className="form-actions">
+      <button className="secondary-button" type="button" disabled={step === 0} onClick={() => move(step - 1)}>Back</button>
+      {!final && <>
+        <button className="secondary-button" type="button" onClick={() => move(step + 1)}>Next</button>
+        <button className="text-link" type="button" onClick={() => move(step + 1)}>Skip</button>
+      </>}
+    </div>
+  </Form>
+}
+
 function App() {
   const [route, setRoute] = useState(getRoute)
   const [journal, setJournal] = useState(() => journalStore.read())
@@ -86,9 +136,10 @@ function App() {
   const main = useRef<HTMLElement>(null)
   const [section, selected] = route.split('/')
   const question = journal.questions.find(item => item.id === selected)
+  const draft = journal.explorations.find(item => item.questionId === question?.id && item.resumeStep !== undefined)
   const date = new Date()
   const [promptTitle, prompt] = prompts[(date.getDate() - 1) % prompts.length]
-  const carrying = journal.questions.filter(item => !journal.explorations.some(exploration => exploration.questionId === item.id))
+  const carrying = journal.questions.filter(item => !journal.explorations.some(exploration => exploration.questionId === item.id && exploration.resumeStep === undefined))
   useEffect(() => {
     function change() {
       const next = getRoute()
@@ -113,14 +164,34 @@ function App() {
     setMessage(notice)
     location.hash = next
   }
-  const questionRows = (items: Journal['questions']) => <div className="question-rows">{items.map(item => <a className="question-row" key={item.id} href={'#explore/' + item.id}><MessageCircle size={17}/><span>{item.title}</span><ChevronRight size={17}/></a>)}</div>
+  function saveExploration(question: Question, entry: Exploration | undefined, notes: string[], photo: string | undefined, resumeStep?: number) {
+    if (resumeStep === undefined && !notes.some(Boolean) && !photo) throw new Error('Add a note or picture before finishing.')
+    const id = entry?.id ?? crypto.randomUUID()
+    commit(latest => {
+      const previous = latest.explorations.find(item => item.id === id)
+      const anotherDraft = latest.explorations.some(item => item.questionId === question.id && item.id !== id && item.resumeStep !== undefined)
+      if (!previous && anotherDraft) throw new Error('A draft was saved in another tab. Reopen this question to continue it.')
+      const followUp = resumeStep === undefined && notes[6] && notes[6] !== previous?.notes[6]
+        ? makeQuestion(notes[6])
+        : resumeStep === undefined && notes[6] && previous?.resumeStep !== undefined
+          ? makeQuestion(notes[6])
+          : undefined
+      const exploration = { ...previous, id, questionId:question.id, date:previous?.date ?? dateKey(), notes, photo, resumeStep }
+      return {
+        ...latest,
+        explorations: previous ? latest.explorations.map(item => item.id === id ? exploration : item) : [exploration, ...latest.explorations],
+        questions: followUp ? [followUp, ...latest.questions] : latest.questions,
+      }
+    }, 'library/' + id, resumeStep === undefined ? 'Exploration saved.' : 'Exploration saved for later.')
+  }
+  const questionRows = (items: Journal['questions']) => <div className="question-rows">{items.map(item => <a className="question-row" key={item.id} href={'#explore/' + item.id}><MessageCircle size={17}/><span>{item.title}{journal.explorations.some(entry => entry.questionId === item.id && entry.resumeStep !== undefined) && <small className="draft-label">In progress</small>}</span><ChevronRight size={17}/></a>)}</div>
   const entries = [
     ...journal.observations.map(item => ({...item, kind:'Observations', label:'Observation', summary:item.senses || item.place, detail:<><p>{item.place}</p><p>{item.senses}</p>{item.surprise && <p><strong>What surprised us</strong> {item.surprise}</p>}{item.question && <p><strong>What we wondered</strong> {item.question}</p>}</>})),
     ...journal.questions.map(item => ({...item, photo:undefined, kind:'Questions', label:'Question', summary:'', detail:<a className="text-link" href={'#explore/' + item.id}>Explore this question</a>})),
     ...journal.explorations.flatMap(item => {
       const title = journal.questions.find(question => question.id === item.questionId)?.title ?? 'Our exploration'
-      const entry = {...item, title, kind:'Explorations', label:'Exploration', summary:item.notes[5] || item.notes.find(Boolean) || '', detail:<dl>{steps.map((step, i) => item.notes[i] && <div key={step}><dt>{step}</dt><dd>{item.notes[i]}</dd></div>)}</dl>}
-      return item.notes[5] ? [entry, {...entry, photo:undefined, id:item.id + '-discovery', kind:'Discoveries', label:'Discovery', title:item.notes[5], summary:title}] : [entry]
+      const entry = {...item, title, kind:'Explorations', label:item.resumeStep === undefined ? 'Exploration' : 'Exploration in progress', summary:item.notes[5] || item.notes.find(Boolean) || '', detail:<><dl>{steps.map((step, i) => item.notes[i] && <div key={step}><dt>{step}</dt><dd>{item.notes[i]}</dd></div>)}</dl>{item.resumeStep !== undefined && <a className="text-link" href={'#explore/' + item.questionId}>Resume exploration</a>}</>}
+      return item.resumeStep === undefined && item.notes[5] ? [entry, {...entry, photo:undefined, id:item.id + '-discovery', kind:'Discoveries', label:'Discovery', title:item.notes[5], summary:title}] : [entry]
     }),
   ].sort((a, b) => b.date.localeCompare(a.date))
   const recent = entries.filter(item => ['Discoveries','Observations'].includes(item.kind)).slice(0, 3)
@@ -164,7 +235,7 @@ function App() {
       </>}
       {section === 'wonder' && <>
         <PageHeading label="Wonder" title="Keep a question">Write down a question in your child’s own words. You can come back to it anytime.</PageHeading>
-        <Form action="Save question" save={(data) => {
+        <Form action="Save question" reset save={(data) => {
           const title = readText(data,'title')
           if (!title) throw new Error('Write the question you want to keep.')
           commit(latest => ({...latest, questions:[makeQuestion(title), ...latest.questions]}), 'wonder', 'Question saved.')
@@ -173,12 +244,8 @@ function App() {
       </>}
       {section === 'explore' && <>
         <PageHeading label="Explore" title={question?.title ?? 'Follow a question'}>{question ? 'Try one small thing together. You can save your notes and return to the question later.' : 'Pick a question to explore together.'}</PageHeading>
-        {question ? <Form key={question.id} action="Save exploration" attachments save={(data, photo) => {
-          const notes = steps.map((_, i) => readText(data, String(i)))
-          if (!notes.some(Boolean) && !photo) throw new Error('Add a note or picture before saving.')
-          const exploration = {id:crypto.randomUUID(), date:dateKey(), questionId:question.id, notes, photo}
-          commit(latest => ({...latest, explorations:[exploration, ...latest.explorations], questions:notes[6] ? [makeQuestion(notes[6]), ...latest.questions] : latest.questions}), 'library/' + exploration.id, 'Exploration saved.')
-        }}>{steps.map((step, i) => <Field key={step} name={String(i)} label={step} placeholder={hints[i]} multiline/>)}</Form> : questionRows(journal.questions)}
+        {question ? <ExplorationForm key={draft?.id ?? question.id} entry={draft}
+          save={(notes, photo, resumeStep) => saveExploration(question, draft, notes, photo, resumeStep)}/> : questionRows(journal.questions)}
       </>}
       {section === 'library' && <>
         <PageHeading label="Discovery library" title="Our field journal">Revisit the things you noticed, the questions you kept and what you found along the way.</PageHeading>
