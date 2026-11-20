@@ -17,6 +17,8 @@ This roadmap records current scope and proposed work. Order the next changes usi
 - The library supports editing existing entries and downloading an image-inclusive JSON copy of the journal.
 - The production build and Chromium checks at 390 px and 1280 px passed for keyboard navigation, quick capture, attachments, editing, legacy links, save and resume after reload, and export. Family use remains the next validation.
 
+- Review follow-up adds direct prompt navigation when editing, guards against stale exploration saves, and explains the export’s restore limit. The browser regression script covers two-tab finishing, image processing and removal, storage quota recovery, and legacy records.
+
 ## Next validation
 
 - Try a short observation and exploration with a parent and six-year-old. Note which prompts lead to looking, talking, making, or a follow-up question.

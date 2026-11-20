@@ -29,12 +29,20 @@ const sample: Journal = {
   explorations: [{id:'e1', date:daysAgo(4), questionId:'q4', notes:['We guessed the shadow would move.', 'We looked at the edge of the shadow.', 'We moved the torch closer to a toy.', 'A toy, a torch and a wall.', 'We watched the size of the shadow.', 'The shadow grew as the torch got closer to the toy.', 'Can two lights make two shadows?', 'We drew around the toy’s shadow.']}],
 }
 const key = 'learning-compass.journal.v1'
+function readJournal(): Journal {
+  const saved = localStorage.getItem(key)
+  return saved ? JSON.parse(saved) : sample
+}
 export const journalStore = {
-  read(): Journal {
-    const saved = localStorage.getItem(key)
-    return saved ? JSON.parse(saved) : sample
+  read: readJournal,
+  async update(update: (latest: Journal) => Journal): Promise<Journal> {
+    function write() {
+      const journal = update(readJournal())
+      localStorage.setItem(key, JSON.stringify(journal))
+      return journal
+    }
+    return navigator.locks ? navigator.locks.request(key, write) : write()
   },
-  write(journal: Journal) { localStorage.setItem(key, JSON.stringify(journal)) },
 }
 export function downloadJournal(journal: Journal) {
   const backup = new Blob([JSON.stringify({ version: 1, ...journal }, null, 2)], { type: 'application/json' })

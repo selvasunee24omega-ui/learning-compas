@@ -60,7 +60,7 @@ function PhotoField({ initialPhoto = '', onChange }: {initialPhoto?: string; onC
 function Form({ children, action, save, attachments = false, initialPhoto, extraActions, reset = false }: {
   children: ReactNode
   action: string
-  save: (data: FormData, photo?: string, intent?: string) => void
+  save: (data: FormData, photo?: string, intent?: string) => Promise<void>
   attachments?: boolean
   initialPhoto?: string
   extraActions?: (pending: boolean) => ReactNode
@@ -68,36 +68,42 @@ function Form({ children, action, save, attachments = false, initialPhoto, extra
 }) {
   const [error, setError] = useState('')
   const [image, setImage] = useState({photo:initialPhoto ?? '', pending:false})
-  function submit(event: FormEvent<HTMLFormElement>) {
+  const [saving, setSaving] = useState(false)
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (image.pending) return
+    if (image.pending || saving) return
+    const form = event.currentTarget
+    setSaving(true)
     setError('')
     try {
       const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
-      save(new FormData(event.currentTarget), image.photo || undefined, submitter?.value)
-      if (reset) event.currentTarget.reset()
+      await save(new FormData(form), image.photo || undefined, submitter?.value)
+      if (reset) form.reset()
     }
     catch (error) {
       setError(error instanceof DOMException ? 'The browser could not save this entry. Try removing the image or freeing some browser storage.' : error instanceof Error ? error.message : 'This entry could not be saved.')
+    } finally {
+      setSaving(false)
     }
   }
   return <form className="journal-form" onSubmit={submit}>{children}
     {attachments && <PhotoField initialPhoto={initialPhoto} onChange={(photo, pending) => setImage({photo, pending})}/>}
+    {image.pending && <p role="status">Preparing image…</p>}
     {error && <p className="error" role="alert">{error}</p>}
     <div className="form-actions">
-      <button className="button" disabled={image.pending}>{action}</button>
-      {extraActions?.(image.pending)}
+      <button className="button" disabled={image.pending || saving}>{action}</button>
+      {extraActions?.(image.pending || saving)}
     </div>
   </form>
 }
 function ObservationForm({ entry, save }: {
   entry?: Observation
-  save: (entry: Observation) => void
+  save: (entry: Observation) => Promise<void>
 }) {
   return <Form action={entry ? 'Save changes' : 'Save observation'} attachments initialPhoto={entry?.photo} save={(data, photo) => {
     const title = readText(data, 'title')
     if (!title) throw new Error('Tell us what you noticed.')
-    save({
+    return save({
       id:entry?.id ?? crypto.randomUUID(), title, photo, date:readText(data, 'date') || dateKey(),
       question:readText(data, 'question'), place:readText(data, 'place'),
       senses:readText(data, 'senses'), surprise:readText(data, 'surprise'),
@@ -119,20 +125,26 @@ function ObservationForm({ entry, save }: {
 function ExplorationForm({ entry, editing, save }: {
   entry?: Exploration
   editing?: boolean
-  save: (notes: string[], photo: string | undefined, resumeStep?: number) => void
+  save: (original: Exploration | undefined, notes: string[], photo: string | undefined, resumeStep?: number) => Promise<void>
 }) {
-  const [step, setStep] = useState(entry?.resumeStep ?? 0)
+  const [original] = useState(entry)
+  const [step, setStep] = useState(original?.resumeStep ?? 0)
   const [notes, setNotes] = useState(() => steps.map((_, index) => entry?.notes[index] ?? ''))
   const prompt = useRef<HTMLTextAreaElement>(null)
   const final = step === steps.length - 1
 
   useEffect(() => { prompt.current?.focus() }, [step])
 
-  return <Form action={editing ? 'Save changes' : final ? 'Finish' : 'Save for later'} attachments initialPhoto={entry?.photo}
+  return <Form action={editing ? 'Save changes' : final ? 'Finish' : 'Save for later'} attachments initialPhoto={original?.photo}
     save={(_, photo, intent) => save(
-      notes.map(note => note.trim()), photo, final && intent !== 'pause' ? undefined : step,
+      original, notes.map(note => note.trim()), photo, final && intent !== 'pause' ? undefined : step,
     )}
     extraActions={pending => !editing && final && <button className="secondary-button" value="pause" disabled={pending}>Save for later</button>}>
+    {editing && <div className="field"><label htmlFor="exploration-step"><span>Jump to a prompt</span></label>
+      <select id="exploration-step" value={step} onChange={event => setStep(Number(event.target.value))}>
+        {steps.map((label, index) => <option key={label} value={index}>{label}</option>)}
+      </select>
+    </div>}
     <p className="eyebrow">Step {step + 1} of {steps.length}</p>
     <label className="field">
       <span>{steps[step]}</span>
@@ -182,9 +194,8 @@ function App() {
   useEffect(() => {
     if (section === 'library' && selected) document.getElementById('entry-' + selected)?.scrollIntoView({ block: 'nearest' })
   }, [section, selected])
-  function commit(update: (latest: Journal) => Journal, next: string, notice: string) {
-    const updated = update(journalStore.read())
-    journalStore.write(updated)
+  async function commit(update: (latest: Journal) => Journal, next: string, notice: string) {
+    const updated = await journalStore.update(update)
     setJournal(updated)
     setFilter('All')
     setMessage(notice)
@@ -192,7 +203,7 @@ function App() {
   }
   function saveObservation(observation: Observation, editing: boolean) {
     const { question, date, id } = observation
-    commit(latest => {
+    return commit(latest => {
       const linked = latest.questions.find(item => item.observationId === id)
       const questions = !question ? latest.questions : linked
         ? latest.questions.map(item => item.id === linked.id ? { ...item, title:question } : item)
@@ -208,13 +219,16 @@ function App() {
   function saveExploration(question: Question, entry: Exploration | undefined, notes: string[], photo: string | undefined, resumeStep?: number) {
     if (resumeStep === undefined && !notes.some(Boolean) && !photo) throw new Error('Add a note or picture before saving.')
     const id = entry?.id ?? crypto.randomUUID()
-    commit(latest => {
+    return commit(latest => {
       const previous = latest.explorations.find(item => item.id === id)
       const anotherDraft = latest.explorations.some(item => item.questionId === question.id && item.id !== id && item.resumeStep !== undefined)
       if (!previous && anotherDraft) throw new Error('A draft was saved in another tab. Reopen this question to continue it.')
-      if (entry?.resumeStep !== undefined && previous?.resumeStep === undefined) throw new Error('This exploration was finished in another tab. Reopen it from the journal to edit it.')
+      if (entry && JSON.stringify(previous) !== JSON.stringify(entry)) {
+        throw new Error('This exploration changed in another tab. Your edits are still here. Copy any notes you want to keep, then reopen the entry.')
+      }
       const finishing = resumeStep === undefined && (!previous || previous.resumeStep !== undefined)
-      const followUp = finishing && notes[6] ? makeQuestion(notes[6]) : undefined
+      const addingFollowUp = resumeStep === undefined && !previous?.followUpQuestionId && !previous?.notes[6]
+      const followUp = (finishing || addingFollowUp) && notes[6] ? makeQuestion(notes[6]) : undefined
       const followUpQuestionId = followUp?.id ?? previous?.followUpQuestionId
       const questions = followUp ? [followUp, ...latest.questions] : followUpQuestionId && notes[6]
         ? latest.questions.map(item => item.id === followUpQuestionId ? { ...item, title:notes[6] } : item)
@@ -290,7 +304,7 @@ function App() {
             const title = readText(data,'title')
             if (!title) throw new Error('Write the question you want to keep.')
             if (question) {
-              commit(latest => ({
+              return commit(latest => ({
                 ...latest,
                 questions:latest.questions.map(item => item.id === question.id ? {...item, title} : item),
                 observations:latest.observations.map(item => item.id === question.observationId && item.question ? {...item, question:title} : item),
@@ -298,7 +312,7 @@ function App() {
                   ? {...item, notes:item.notes.map((note, index) => index === 6 ? title : note)} : item),
               }), 'library/' + question.id, 'Question updated.')
             } else {
-              commit(latest => ({...latest, questions:[makeQuestion(title), ...latest.questions]}), 'wonder', 'Question saved.')
+              return commit(latest => ({...latest, questions:[makeQuestion(title), ...latest.questions]}), 'wonder', 'Question saved.')
             }
           }}><Field name="title" label="What are we wondering?" placeholder="Why do some leaves have different shapes?" value={question?.title} required/></Form>}
         {!selected && <section className="collection"><h2>Our questions</h2>{questionRows(journal.questions)}</section>}
@@ -306,13 +320,13 @@ function App() {
       {section === 'explore' && <>
         <PageHeading label={editingExploration ? 'Edit exploration' : 'Explore'} title={question?.title ?? 'Follow a question'}>{question ? 'Try one small thing together. You can save your notes and return to the question later.' : 'Pick a question to explore together.'}</PageHeading>
         {explorationId && !editingExploration ? <p>That exploration could not be found. <a className="text-link" href="#library">Open the journal</a></p> :
-          question ? <ExplorationForm key={editingExploration?.id ?? draft?.id ?? question.id} entry={editingExploration ?? draft} editing={Boolean(editingExploration)}
-            save={(notes, photo, resumeStep) => saveExploration(question, editingExploration ?? draft, notes, photo, editingExploration ? undefined : resumeStep)}/> : questionRows(journal.questions)}
+          question ? <ExplorationForm key={route} entry={editingExploration ?? draft} editing={Boolean(editingExploration)}
+            save={(original, notes, photo, resumeStep) => saveExploration(question, original, notes, photo, editingExploration ? undefined : resumeStep)}/> : questionRows(journal.questions)}
       </>}
       {section === 'library' && <>
         <PageHeading label="Discovery library" title="Our field journal">Revisit the things you noticed, the questions you kept and what you found along the way.</PageHeading>
         <div className="journal-backup">
-          <p>This journal is stored in this browser on this device. Save a copy to keep your notes and images.</p>
+          <p>This journal is stored in this browser on this device. Download a copy of your notes and images. This version cannot restore a journal from that file.</p>
           <button className="secondary-button" onClick={() => downloadJournal(journalStore.read())}>Download JSON backup</button>
         </div>
         <div className="filters" aria-label="Filter journal">{kinds.map(kind => <button key={kind} aria-pressed={filter === kind} onClick={() => {setFilter(kind); if (selected) location.hash = 'library'}}>{kind}</button>)}</div>
