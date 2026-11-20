@@ -98,3 +98,6 @@ details[open] summary svg{rotate:90deg}
 .observation-details>summary{grid-template-columns:max-content 1fr auto;color:#45523e;font-weight:700}
 .observation-details>summary span{font-weight:400;font-size:.9rem}
 .observation-details>div{display:grid;gap:16px;padding:4px 6px 16px}
+.entry-actions{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;margin-top:9px}
+.entry-actions:empty{display:none}
+.journal-backup{max-width:830px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding:12px 16px;background:#e9ecdf;border-radius:8px;color:#45523e}

@@ -10,6 +10,13 @@ This roadmap records current scope and proposed work. Order the next changes usi
 - Production build passed. Automated checks covered creating and revisiting entries, discovery filtering, and persistence on a fresh load.
 - The private preview is deployed. Live mobile layout and photo upload still need hands-on verification.
 
+## v0.1 journal improvements in review
+
+- Guided Explore presents one prompt at a time, supports skipping and revisiting steps, and resumes a saved draft at the same prompt.
+- Observe can save one sentence and an optional image immediately. Location, date, sensory details, surprises, and related questions are available under optional details.
+- The library supports editing existing entries and downloading an image-inclusive JSON copy of the journal.
+- The production build and Chromium checks at 390 px and 1280 px passed for keyboard navigation, quick capture, attachments, editing, legacy links, save and resume after reload, and export. Family use remains the next validation.
+
 ## Next validation
 
 - Try a short observation and exploration with a parent and six-year-old. Note which prompts lead to looking, talking, making, or a follow-up question.
@@ -18,7 +25,7 @@ This roadmap records current scope and proposed work. Order the next changes usi
 
 ## Later candidates
 
-- Evaluate whether families need editing, export, or backup as their journals grow.
+- Evaluate whether families need to restore a downloaded journal or move it to another device.
 - Revisit accounts, database storage, and cross-device access if families need them. Plan how existing browser-local journals would move before changing storage.
 - Explore optional AI-assisted inquiry after identifying where families need more help choosing what to observe or try.
 
