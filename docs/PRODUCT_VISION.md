@@ -11,7 +11,7 @@ We are designing for families with children aged 3–9, starting with a parent a
 - **Today** invites the family to notice something nearby, shows open questions and recent discoveries, and offers a simple activity.
 - **Observe** captures a dated experience in the family’s own words, with room for sensory details, a surprise, a question, or an image.
 - **Wonder** preserves children’s questions and lets the family choose one when the time feels right.
-- **Explore** guides the family from a guess through observation or a small trial to a discovery, reflection, or another question.
+- **Explore** takes a noticing or a question and suggests one invitation. The family can try it, choose another approach, save, or stop whenever they like. The child’s words and what they actually did stay in the journal.
 - **Discovery Library** makes earlier observations, questions, explorations, discoveries, photos, and pictures of drawings easy to revisit.
 
 ## What success looks like

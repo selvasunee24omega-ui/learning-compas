@@ -19,6 +19,12 @@ This roadmap records current scope and proposed work. Order the next changes usi
 
 - Review follow-up adds direct prompt navigation when editing, guards against stale exploration saves, and explains the export’s restore limit. The browser regression script covers two-tab finishing, image processing and removal, storage quota recovery, and legacy records.
 
+## v0.2 adaptive inquiry in review
+
+- Offer a single optional invitation after a noticing or question. Families can change approaches, skip, save, or stop. Reported words can change the next suggestion.
+- Save and revisit inquiry moments, including photos and drawings. Older eight-note explorations and their saved drafts remain available in the journal.
+- Use deterministic recommendations in the browser. Test the rules with families before considering a service.
+
 ## Next validation
 
 - Try a short observation and exploration with a parent and six-year-old. Note which prompts lead to looking, talking, making, or a follow-up question.

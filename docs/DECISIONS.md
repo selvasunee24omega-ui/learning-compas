@@ -24,7 +24,7 @@ Start feature work by reading the root guidance and the four project documents. 
 
 ## 2026-11-20 · Resume guided exploration from the saved prompt
 
-Show one authored prompt at a time so families can pause between observations. Save for later records the current prompt and all notes on the exploration itself. Finishing updates the same record and can add a follow-up question. Existing explorations retain their original eight note positions and are treated as complete.
+Show one authored prompt at a time so families can pause between observations. Save for later records the current prompt and all notes on the exploration itself. Finishing updates the same record and can add a follow-up question. Existing explorations retain their original eight note positions and are treated as complete unless they have a saved prompt. The [adaptive inquiry decision](#2026-11-20--choose-one-invitation-from-the-childs-words) supersedes this flow for new inquiries.
 
 ## 2026-11-20 · Make details optional and preserve links during edits
 
@@ -37,3 +37,9 @@ Keep the existing storage key and add draft metadata as optional fields. Export 
 ## 2026-11-20 · Protect exploration drafts across tabs
 
 Use a browser storage lock where Web Locks is available to serialize journal writes. An exploration form keeps the version it opened with so a save can detect a change made in another tab. If a save conflicts or storage fills up, keep the edits on screen and show a message. Completed explorations can jump directly to a prompt and save all notes from any step.
+
+## 2026-11-20 · Choose one invitation from the child's words
+
+New Explore sessions use a transparent browser-local suggestion engine. It accepts the child's words, prior moments, skipped invitations, and an optional parent choice. It returns one invitation with a short reason, or a pause when that approach has run out of invitations. It never writes an observation or answer for the child. The engine boundary gives a future consent-based service a place to integrate while the family keeps control of the invitation and their data.
+
+Store adaptive inquiries as an optional collection under the existing journal key. The absence of the collection means the original journal has no adaptive entries. No rewrite is needed when reading older data. Each inquiry retains its source ID, starting words, and timestamped responses and attachments. Its current suggestion is saved for resuming. Existing eight-note explorations, including drafts, keep their original fields, links, and editor.
