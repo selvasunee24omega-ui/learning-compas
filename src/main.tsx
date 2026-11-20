@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { BookOpen, ChevronRight, Compass, Eye, House, Leaf, MessageCircle, Plus, Sprout, Sun, Telescope, Upload } from 'lucide-react'
 import { dateKey, hints, journalStore, prepareImage, readable, steps } from './journal'
-import type { Exploration, Journal, Question } from './journal'
+import type { Exploration, Journal, Observation, Question } from './journal'
 import './style.css'
 
 const routes = [
@@ -26,7 +26,7 @@ function PageHeading({ label, title, children }: {label: string; title: string; 
   return <header className="page-heading"><p className="eyebrow">{label}</p><h1>{title}</h1><p>{children}</p></header>
 }
 function Field({ name, label, placeholder, multiline, required, type = 'text', value }: {name: string; label: string; placeholder?: string; multiline?: boolean; required?: boolean; type?: string; value?: string}) {
-  return <label className="field"><span>{label}</span>{multiline ? <textarea name={name} placeholder={placeholder} required={required} rows={3}/> : <input name={name} type={type} defaultValue={value} placeholder={placeholder} required={required}/>}</label>
+  return <label className="field"><span>{label}</span>{multiline ? <textarea name={name} placeholder={placeholder} required={required} defaultValue={value} rows={3}/> : <input name={name} type={type} defaultValue={value} placeholder={placeholder} required={required}/>}</label>
 }
 function PhotoField({ initialPhoto = '', onChange }: {initialPhoto?: string; onChange: (photo: string, pending: boolean) => void}) {
   const [photo, setPhoto] = useState(initialPhoto)
@@ -54,7 +54,7 @@ function PhotoField({ initialPhoto = '', onChange }: {initialPhoto?: string; onC
   return <div className="photo-field">
     <label className="field"><span><Upload size={17}/> Add a photo or a picture of a drawing <small>(optional)</small></span><input ref={input} type="file" accept="image/*" onChange={change}/></label>
     {error && <p role="alert">{error}</p>}
-    {photo && <><img className="entry-photo" src={photo} alt="Selected journal attachment"/><button type="button" className="text-link" onClick={() => {if (input.current) input.current.value = ''; setPhoto(''); onChange('', false)}}>Remove image</button></>}
+    {photo && <><img className="entry-photo" src={photo} alt="Selected journal attachment"/><button type="button" className="text-link" onClick={() => {sequence.current++; if (input.current) input.current.value = ''; setPhoto(''); onChange('', false)}}>Remove image</button></>}
   </div>
 }
 function Form({ children, action, save, attachments = false, initialPhoto, extraActions, reset = false }: {
@@ -90,6 +90,32 @@ function Form({ children, action, save, attachments = false, initialPhoto, extra
     </div>
   </form>
 }
+function ObservationForm({ entry, save }: {
+  entry?: Observation
+  save: (entry: Observation) => void
+}) {
+  return <Form action={entry ? 'Save changes' : 'Save observation'} attachments initialPhoto={entry?.photo} save={(data, photo) => {
+    const title = readText(data, 'title')
+    if (!title) throw new Error('Tell us what you noticed.')
+    save({
+      id:entry?.id ?? crypto.randomUUID(), title, photo, date:readText(data, 'date') || dateKey(),
+      question:readText(data, 'question'), place:readText(data, 'place'),
+      senses:readText(data, 'senses'), surprise:readText(data, 'surprise'),
+    })
+  }}>
+    <Field name="title" label="What did we notice?" placeholder="A tiny trail of ants crossed the wall." value={entry?.title} required/>
+    <details className="observation-details" open={Boolean(entry)}>
+      <summary>Add details <span>(optional)</span><ChevronRight size={17}/></summary>
+      <div>
+        <div className="field-row"><Field name="place" label="Where did we notice it?" placeholder="On the garden wall" value={entry?.place}/><Field name="date" label="Date" type="date" value={entry?.date ?? dateKey()}/></div>
+        <Field name="senses" label="What did it look, sound, feel or behave like?" multiline value={entry?.senses}/>
+        <Field name="surprise" label="What surprised us?" multiline value={entry?.surprise}/>
+        <Field name="question" label="Did a question come up?" placeholder="Where were the ants going?" value={entry?.question}/>
+      </div>
+    </details>
+  </Form>
+}
+
 function ExplorationForm({ entry, save }: {
   entry?: Exploration
   save: (notes: string[], photo: string | undefined, resumeStep?: number) => void
@@ -218,20 +244,14 @@ function App() {
       </>}
       {section === 'observe' && <>
         <PageHeading label="Observe" title="Make a field note">Slow down and put what you noticed into your own words.</PageHeading>
-        <Form action="Save observation" attachments save={(data, photo) => {
-          const title = readText(data,'title')
-          if (!title) throw new Error('Tell us what you noticed.')
-          const date = readText(data, 'date')
-          const question = readText(data, 'question')
-          const observation = { id:crypto.randomUUID(), title, date, photo, question, place:readText(data,'place'), senses:readText(data,'senses'), surprise:readText(data,'surprise') }
-          commit(latest => ({ ...latest, observations:[observation, ...latest.observations], questions:question ? [{...makeQuestion(question, date), observationId:observation.id}, ...latest.questions] : latest.questions }), 'library/' + observation.id, 'Observation saved.')
-        }}>
-          <Field name="title" label="What did we notice?" placeholder="A tiny trail of ants" required/>
-          <div className="field-row"><Field name="place" label="Where did we notice it?" placeholder="On the garden wall"/><Field name="date" label="Date" type="date" required value={dateKey()}/></div>
-          <Field name="senses" label="What did it look, sound, feel or behave like?" multiline/>
-          <Field name="surprise" label="What surprised us?" multiline/>
-          <Field name="question" label="Did a question come up? (optional)" placeholder="Where were the ants going?"/>
-        </Form>
+        <ObservationForm save={observation => {
+          const { question, date, id } = observation
+          commit(latest => ({
+            ...latest,
+            observations:[observation, ...latest.observations],
+            questions:question ? [{...makeQuestion(question, date), observationId:id}, ...latest.questions] : latest.questions,
+          }), 'library/' + id, 'Observation saved.')
+        }}/>
       </>}
       {section === 'wonder' && <>
         <PageHeading label="Wonder" title="Keep a question">Write down a question in your child’s own words. You can come back to it anytime.</PageHeading>

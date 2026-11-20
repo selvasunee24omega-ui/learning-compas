@@ -95,3 +95,6 @@ details[open] summary svg{rotate:90deg}
 .secondary-button:disabled{opacity:.55;cursor:default}
 .step-hint{color:var(--muted)}
 .draft-label{display:block;color:var(--muted);font-size:.8rem}
+.observation-details>summary{grid-template-columns:max-content 1fr auto;color:#45523e;font-weight:700}
+.observation-details>summary span{font-weight:400;font-size:.9rem}
+.observation-details>div{display:grid;gap:16px;padding:4px 6px 16px}
